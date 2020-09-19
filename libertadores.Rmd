@@ -86,3 +86,101 @@ for (ano in 1960:2020) {
 ```
 
 O código não retornou nenhum erro, o que indica que todas as url's são válidas.
+
+- Análise do XPath
+
+A tabela dos times classificados em 1960 tem XPath  //*[@id="mw-content-text"]/div[1]/table[2]. Para o ano de 1961, o mesmo Xpath. Com isso, a estratégia é verificar se a tabela para todos os anos tem o mesmo Xpath.
+Criamos um vetor vazio anos, onde armazenamos no vetor cada ano antes de importar a tabela.
+
+```{r, eval = FALSE}
+anos = numeric(0)
+for (ano in 1960:2020) {
+    anos = c(anos, ano) # adicionando o ano no vetor anos 
+    url = paste0('https://pt.wikipedia.org/wiki/Copa_Libertadores_da_Am%C3%A9rica_de_', ano)
+    resultado = url %>% read_html() %>%
+    html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[2]') %>% 
+    html_table()
+}
+```
+
+O algoritmo retornou erro, o que significa que, para algum ano, o Xpath da tabela não é o mesmo que em 1960. Analisando o algoritmo, esse ano é o último elemento do vetor anos.
+
+```{r, eval = FALSE}
+last(anos) # extraindo último elemento
+```
+
+O algoritmo não conseguiu extrair a tabela para o ano de 1976. Antes da avaliar separadamente esse caso, vamos verificar os anos restantes.
+
+```{r, eval = FALSE}
+for (ano in 1960:2020) {
+    url = paste0('https://pt.wikipedia.org/wiki/Copa_Libertadores_da_Am%C3%A9rica_de_', ano)
+    resultado = try(url %>% read_html() %>%
+    html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[2]') %>% 
+    html_table())
+    if(inherits(resultado, "try-error")) {
+      anos = c(anos, ano) # adicionando o ano no vetor anos
+    }
+    # anos = c(anos, ano) # adicionando o ano no vetor anos 
+}
+anos
+```
+
+O Xpath da tabela para o ano de 1976 é //*[@id="mw-content-text"]/div[1]/table[3]. Seguindo o mesmo raciocínio acima, vamos ver quais anos que também tem esse valor de Xpath.
+
+```{r, eval = FALSE}
+aux = numeric(0)
+for (ano in anos) {
+    url = paste0('https://pt.wikipedia.org/wiki/Copa_Libertadores_da_Am%C3%A9rica_de_', ano)
+    resultado = try(url %>% read_html() %>%
+    html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[3]') %>% 
+    html_table())
+    if(inherits(resultado, "try-error")) {
+      aux = c(aux, ano) # adicionando o ano no vetor anos
+    }
+    # anos = c(anos, ano) # adicionando o ano no vetor anos 
+}
+aux
+```
+
+Sobraram dois anos: 1980 e 1993. Além disso, a mensagem de erro é diferente que os casos anteriores. Para entender melhor, analisamos a tabela do ano de 1980. Acontece que a tabela tem um formato diferente. Com isso, temos que adotar outra estratégia para importar essa tabela.
+
+Com a tabela nesse formato, não conseguimos importar de uma vez para todos os países. Logo, importamos para cada país separadamente e agrupamos em uma única tabela. Além disso, importamos cada tabela no formato texto, pois nosso algoritmo não importa como tabela.
+
+```{r, eval = FALSE}
+url = ('https://pt.wikipedia.org/wiki/Copa_Libertadores_da_Am%C3%A9rica_de_1980#Primeira_fase')
+
+resultado = url %>%
+  read_html() %>%
+  html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[3]') %>%
+  html_text()
+
+resultado[[1]]
+```
+
+
+
+```{r, eval = FALSE}
+start <- gsub("\\n\n","~~",as.character(resultado[[1]])) 
+
+dat <- map(start, function(x) {
+  tibble(text = unlist(str_split(x, pattern = "\\n"))) %>%
+    rowid_to_column(var = "line")
+})
+
+tabela_aux = as.data.frame(dat[[1]] %>% select(text))
+pais = rep(tabela_aux[1,1], nrow(tabela_aux))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
